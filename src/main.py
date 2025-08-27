@@ -247,6 +247,8 @@ def main():
         notify_expiring_issues()
     elif config.notify_for == 'missing_duedate':
         notify_missing_duedate()
+    elif config.notify_for == 'overdue_issues':
+        notify_overdue_issues()
     else:
         raise Exception('Unsupported value for argument \'notify_for\'')
 
