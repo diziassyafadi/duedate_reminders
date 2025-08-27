@@ -6,7 +6,7 @@ import config
 
 def get_repo_issues(owner, repository, duedate_field_name, after=None, issues=None):
     query = """
-    query GetRepoIssues($owner: String!, $repo: String!, $duedate: String!, $after: String) {
+    query GetRepoIssues($owner: String!, $repo: String!, $duedate: String!, $statusFieldName: String!, $after: String) {
           repository(owner: $owner, name: $repo) {
             issues(first: 100, after: $after, states: [OPEN]) {
               nodes {
@@ -33,6 +33,12 @@ def get_repo_issues(owner, repository, duedate_field_name, after=None, issues=No
                         date
                       }
                     }
+                    statusField: fieldValueByName(name: $statusFieldName) {
+                      ... on ProjectV2ItemFieldSingleSelectValue {
+                        id
+                        name
+                      }
+                    }
                   }
                 }
               }
@@ -51,6 +57,7 @@ def get_repo_issues(owner, repository, duedate_field_name, after=None, issues=No
         'owner': owner,
         'repo': repository,
         'duedate': duedate_field_name,
+        'statusFieldName': "Status",
         'after': after
     }
 
@@ -81,7 +88,7 @@ def get_repo_issues(owner, repository, duedate_field_name, after=None, issues=No
 
 def get_project_issues(owner, owner_type, project_number, duedate_field_name, filters=None, after=None, issues=None):
     query = f"""
-    query GetProjectIssues($owner: String!, $projectNumber: Int!, $duedate: String!, $after: String)  {{
+    query GetProjectIssues($owner: String!, $projectNumber: Int!, $duedate: String!, $statusFieldName: String!, $after: String)  {{
           {owner_type}(login: $owner) {{
             projectV2(number: $projectNumber) {{
               id
@@ -94,6 +101,12 @@ def get_project_issues(owner, owner_type, project_number, duedate_field_name, fi
                     ... on ProjectV2ItemFieldDateValue {{
                       id
                       date
+                    }}
+                  }}
+                  statusField: fieldValueByName(name: $statusFieldName) {{
+                    ... on ProjectV2ItemFieldSingleSelectValue {{
+                        id
+                        name
                     }}
                   }}
                   content {{
@@ -129,6 +142,7 @@ def get_project_issues(owner, owner_type, project_number, duedate_field_name, fi
         'owner': owner,
         'projectNumber': project_number,
         'duedate': duedate_field_name,
+        'statusFieldName': "Status" ,
         'after': after
     }
 

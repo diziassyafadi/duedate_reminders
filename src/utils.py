@@ -14,7 +14,8 @@ def prepare_missing_duedate_comment(issue: dict, assignees: dict):
     comment = ''
     if assignees:
         for assignee in assignees:
-            comment += f'@{assignee["login"]} '
+            if assignee.get("login") and assignee["login"].strip():
+                comment += f'@{assignee["login"]} '
     else:
         logger.info(f'No assignees found for issue #{issue["number"]}')
 
@@ -32,7 +33,8 @@ def prepare_expiring_issue_comment(issue: dict, assignees: dict, duedate):
     comment = ''
     if assignees:
         for assignee in assignees:
-            comment += f'@{assignee["login"]} '
+            if assignee.get("login") and assignee["login"].strip():
+                comment += f'@{assignee["login"]} '
     else:
         logger.info(f'No assignees found for issue #{issue["number"]}')
 
@@ -41,18 +43,37 @@ def prepare_expiring_issue_comment(issue: dict, assignees: dict, duedate):
 
     return comment
 
+def prepare_overdue_issue_comment(issue: dict, assignees: dict, duedate):
+    """
+    Prepare the comment from the given arguments and return it
+    """
+
+    comment = ''
+    if assignees:
+        for assignee in assignees:
+            if assignee.get("login") and assignee["login"].strip():
+                comment += f'@{assignee["login"]} '
+    else:
+        logger.info(f'No assignees found for issue #{issue["number"]}')
+
+    comment += f'The issue is overdue since: {duedate.strftime("%b %d, %Y")}'
+    logger.info(f'Issue {issue["title"]} | {comment}')
+
+    return comment
 
 def prepare_missing_duedate_email_message(issue, assignees):
     """
     Prepare the email message, subject and mail_to addresses
     """
-    subject = f'Re: [{config.repository}] {issue["title"]} (#{issue["number"]})'
+    subject = f"[Reminder: Set Due Date] {issue['title']} (#{issue['number']})"
     _assignees = ''
     mail_to = []
     if assignees:
         for assignee in assignees:
-            _assignees += f'@{assignee["name"]} '
-            mail_to.append(assignee['email'])
+            if assignee.get("name") and assignee["name"].strip():
+                _assignees += f'@{assignee["name"]} '
+            if assignee.get('email') and assignee['email'].strip():
+                mail_to.append(assignee['email'])
     else:
         logger.info(f'No assignees found for issue #{issue["number"]}')
 
@@ -63,48 +84,133 @@ def prepare_missing_duedate_email_message(issue, assignees):
     return [subject, message, mail_to]
 
 
+from datetime import datetime
+
 def prepare_expiring_issue_email_message(issue, assignees, duedate):
     """
     Prepare the email message, subject and mail_to addresses
     """
-    subject = f'Re: [{config.repository}] {issue["title"]} (#{issue["number"]})'
+    # Calculate remaining days until due date
+    today = datetime.now().date()
+    remaining_days = (duedate - today).days
+
+    # if remaining_days is 0, then it is due today
+    if remaining_days == 0:
+        subject = f"[Reminder: Due today] {issue['title']} (#{issue['number']})"
+    elif remaining_days == 1:
+        subject = f"[Reminder: Due tomorrow] {issue['title']} (#{issue['number']})"
+    else:
+        subject = f"[Reminder: Due in {remaining_days} days] {issue['title']} (#{issue['number']})"
+
     _assignees = ''
     mail_to = []
     if assignees:
         for assignee in assignees:
-            _assignees += f'@{assignee["name"]} '
-            mail_to.append(assignee['email'])
+            if assignee.get('name') and assignee['name'].strip():
+                _assignees += f"@{assignee['name']} "
+            if assignee.get('email') and assignee['email'].strip():
+                mail_to.append(assignee['email'])
     else:
-        logger.info(f'No assignees found for issue #{issue["number"]}')
+        logger.info(f"No assignees found for issue #{issue['number']}")
 
-    message = f'Assignees: {_assignees}' \
-              f'<br>The issue is due on: {duedate.strftime("%b %d, %Y")}' \
-              f'<br><br>{issue["url"]}'
+    # Adjust message based on remaining days
+    if remaining_days == 0:
+        due_text = "is due <strong>today</strong>"
+    elif remaining_days == 1:
+        due_text = "is due <strong>tomorrow</strong>"
+    else:
+        due_text = f"is due in <strong>{remaining_days} days</strong>"
+
+    message = f"""
+    <p>Reminder: The issue <strong>{issue['title']}</strong> (#{issue['number']}) {due_text} on <strong>{duedate.strftime('%b %d, %Y')}</strong>.</p>
+    <p>Assignees: {_assignees.strip() if _assignees.strip() else 'No assignees'}</p>
+    <p>Please ensure the due date is met.</p>
+    <p><a href="{issue['url']}">View Issue</a></p>
+    """
 
     return [subject, message, mail_to]
 
+def prepare_overdue_issue_email_message(issue, assignees, duedate):
+    """
+    Prepare the email message, subject and mail_to addresses
+    """
+
+    subject = f"[Reminder: Overdue Issue] {issue['title']} (#{issue['number']})"
+    
+    _assignees = ''
+    mail_to = []
+    if assignees:
+        for assignee in assignees:
+            if assignee.get('name') and assignee['name'].strip():
+                _assignees += f"@{assignee['name']} "
+            if assignee.get('email') and assignee['email'].strip():
+                mail_to.append(assignee['email'])
+    else:
+        logger.info(f"No assignees found for issue #{issue['number']}")
+
+    message = f"""
+    <p>Reminder: The issue <strong>{issue['title']}</strong> (#{issue['number']}) is overdue since <strong>{duedate.strftime('%b %d, %Y')}</strong>.</p>
+    <p>Assignees: {_assignees.strip() if _assignees.strip() else 'No assignees'}</p>
+    <p>Please ensure the issue is completed.</p>
+    <p><a href="{issue['url']}">View Issue</a></p>
+    """
+
+    return [subject, message, mail_to]
 
 def send_email(from_email: str, to_email: list, subject: str, html_body: str):
-    smtp_server = smtplib.SMTP(config.smtp_server, config.smtp_port)
-    smtp_server.starttls()
-    smtp_server.login(config.smtp_username, config.smtp_password)
+    # Filter invalid/empty emails
+    to_email = [addr.strip() for addr in to_email if addr and addr.strip()]
+    if not to_email:
+        logger.warning(f"Skipping email '{subject}' because no recipients were provided.")
+        return
+    
+    # smtp_server = smtplib.SMTP(config.smtp_server, config.smtp_port)
+    # smtp_server.starttls()
+    # smtp_server.login(config.smtp_username, config.smtp_password)
 
-    # Create the plain text version of the email
-    text_body = html2text.html2text(html_body)
+    # Always CC this address (if valid)
+    cc_email = config.smtp_cc_email.strip() if getattr(config, "smtp_cc_email", "").strip() else None
 
     message = MIMEMultipart()
     message['From'] = from_email
     message['To'] = ", ".join(to_email)
+    if cc_email:
+        message['Bcc'] = cc_email
     message['Subject'] = subject
 
-    # Attach the plain text version
-    # message.attach(MIMEText(text_body, 'plain'))
-
-    # Attach the HTML version
     message.attach(MIMEText(html_body, 'html'))
 
-    # Send the email
-    text = message.as_string()
-    smtp_server.sendmail(from_email, to_email, text)
+    recipients = to_email[:]
+    if cc_email:
+        recipients.append(cc_email)
+    
+    smtp_endpoints = [
+        {"port": 587, "use_ssl": False},  # STARTTLS
+        {"port": 465, "use_ssl": True},   # SSL
+    ]
 
-    smtp_server.quit()
+    last_error = None
+    for endpoint in smtp_endpoints:
+        try:
+            if endpoint["use_ssl"]:
+                smtp_server = smtplib.SMTP_SSL(config.smtp_server, endpoint["port"])
+            else:
+                smtp_server = smtplib.SMTP(config.smtp_server, endpoint["port"])
+                smtp_server.starttls()
+            smtp_server.login(config.smtp_username, config.smtp_password)
+
+            smtp_server.sendmail(from_email, recipients, message.as_string())
+            smtp_server.close()
+            logger.info(f"Email '{subject}' sent via port {endpoint['port']}")
+            return  # success → stop trying
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Failed to send via port {endpoint['port']} ({'SSL' if endpoint['use_ssl'] else 'STARTTLS'}): {e}")
+            continue
+
+    # If all failed
+    logger.error(f"Could not send email '{subject}'. Last error: {last_error}")
+    raise last_error
+
+    # smtp_server.sendmail(from_email, recipients, message.as_string())
+    # smtp_server.quit()
