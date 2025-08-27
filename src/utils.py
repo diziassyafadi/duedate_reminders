@@ -41,6 +41,22 @@ def prepare_expiring_issue_comment(issue: dict, assignees: dict, duedate):
 
     return comment
 
+def prepare_overdue_issue_comment(issue: dict, assignees: dict, duedate):
+    """
+    Prepare the comment from the given arguments and return it
+    """
+
+    comment = ''
+    if assignees:
+        for assignee in assignees:
+            comment += f'@{assignee["login"]} '
+    else:
+        logger.info(f'No assignees found for issue #{issue["number"]}')
+
+    comment += f'The issue is overdue since: {duedate.strftime("%b %d, %Y")}'
+    logger.info(f'Issue {issue["title"]} | {comment}')
+
+    return comment
 
 def prepare_missing_duedate_email_message(issue, assignees):
     """
@@ -73,7 +89,13 @@ def prepare_expiring_issue_email_message(issue, assignees, duedate):
     today = datetime.now().date()
     remaining_days = (duedate - today).days
 
-    subject = f"Reminder: Due in {remaining_days} days for {issue['title']} (#{issue['number']})"
+    # if remaining_days is 0, then it is due today
+    if remaining_days == 0:
+        subject = f"Reminder: Due today for {issue['title']} (#{issue['number']})"
+    elif remaining_days == 1:
+        subject = f"Reminder: Due tomorrow for {issue['title']} (#{issue['number']})"
+    else:
+        subject = f"Reminder: Due in {remaining_days} days for {issue['title']} (#{issue['number']})"
 
     _assignees = ''
     mail_to = []
@@ -84,8 +106,16 @@ def prepare_expiring_issue_email_message(issue, assignees, duedate):
     else:
         logger.info(f"No assignees found for issue #{issue['number']}")
 
+    # Adjust message based on remaining days
+    if remaining_days == 0:
+        due_text = "is due <strong>today</strong>"
+    elif remaining_days == 1:
+        due_text = "is due <strong>tomorrow</strong>"
+    else:
+        due_text = f"is due in <strong>{remaining_days} days</strong>"
+
     message = f"""
-    <p>Reminder: The issue <strong>{issue['title']}</strong> (#{issue['number']}) is due in <strong>{remaining_days} days</strong> on <strong>{duedate.strftime('%b %d, %Y')}</strong>.</p>
+    <p>Reminder: The issue <strong>{issue['title']}</strong> (#{issue['number']}) {due_text} on <strong>{duedate.strftime('%b %d, %Y')}</strong>.</p>
     <p>Assignees: {_assignees or 'None'}</p>
     <p>Please ensure the due date is met.</p>
     <p><a href="{issue['url']}">View Issue</a></p>
@@ -93,7 +123,30 @@ def prepare_expiring_issue_email_message(issue, assignees, duedate):
 
     return [subject, message, mail_to]
 
+def prepare_overdue_issue_email_message(issue, assignees, duedate):
+    """
+    Prepare the email message, subject and mail_to addresses
+    """
 
+    subject = f"Reminder: Overdue for {issue['title']} (#{issue['number']})"
+    
+    _assignees = ''
+    mail_to = []
+    if assignees:
+        for assignee in assignees:
+            _assignees += f"@{assignee['name']} "
+            mail_to.append(assignee['email'])
+    else:
+        logger.info(f"No assignees found for issue #{issue['number']}")
+
+    message = f"""
+    <p>Reminder: The issue <strong>{issue['title']}</strong> (#{issue['number']}) is overdue since <strong>{duedate.strftime('%b %d, %Y')}</strong>.</p>
+    <p>Assignees: {_assignees or 'None'}</p>
+    <p>Please ensure the issue is completed.</p>
+    <p><a href="{issue['url']}">View Issue</a></p>
+    """
+
+    return [subject, message, mail_to]
 
 def send_email(from_email: str, to_email: list, subject: str, html_body: str):
     if not to_email:
@@ -103,12 +156,16 @@ def send_email(from_email: str, to_email: list, subject: str, html_body: str):
     smtp_server.starttls()
     smtp_server.login(config.smtp_username, config.smtp_password)
 
+    # Always CC this address
+    cc_email = config.smtp_cc_email
+
     # Create the plain text version of the email
-    text_body = html2text.html2text(html_body)
+    # text_body = html2text.html2text(html_body)
 
     message = MIMEMultipart()
     message['From'] = from_email
     message['To'] = ", ".join(to_email)
+    message['Cc'] = cc_email
     message['Subject'] = subject
 
     # Attach the plain text version
@@ -117,8 +174,10 @@ def send_email(from_email: str, to_email: list, subject: str, html_body: str):
     # Attach the HTML version
     message.attach(MIMEText(html_body, 'html'))
 
+    recipients = to_email + ([cc_email] if cc_email else [])
+
     # Send the email
     text = message.as_string()
-    smtp_server.sendmail(from_email, to_email, text)
+    smtp_server.sendmail(from_email, recipients, text)
 
     smtp_server.quit()

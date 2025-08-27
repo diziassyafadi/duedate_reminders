@@ -53,3 +53,6 @@ inputs:
   smtp_from_email:
     description: "The mail from email address"
     required: false
+  smtp_cc_email:
+    description: "The mail cc email address"
+    required: true

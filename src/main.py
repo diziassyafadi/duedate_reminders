@@ -4,6 +4,93 @@ import config
 import utils
 import graphql
 
+def notify_overdue_issues():
+    if config.is_enterprise:
+        # Get the issues
+        issues = graphql.get_project_issues(
+            owner=config.repository_owner,
+            owner_type=config.repository_owner_type,
+            project_number=config.project_number,
+            duedate_field_name=config.duedate_field_name,
+            filters={'open_only': True}
+        )
+    else:
+        # Get the issues
+        issues = graphql.get_repo_issues(
+            owner=config.repository_owner,
+            repository=config.repository_name,
+            duedate_field_name=config.duedate_field_name
+        )
+
+    # Check if there are issues available
+    if not issues:
+        logger.info('No issues has been found')
+        return
+
+    # Loop through issues
+    for issue in issues:
+        if config.is_enterprise:
+            projectItem = issue
+            issue = issue['content']
+        else:
+            projectNodes = issue['projectItems']['nodes']
+
+            # If no project is assigned to the
+            if not projectNodes:
+                continue
+
+            # Check if the desire project is assigned to the issue
+            projectItem = next((entry for entry in projectNodes if entry['project']['number'] == config.project_number),
+                               None)
+
+        # The fieldValueByName contains the date for the DueDate Field
+        if not projectItem['fieldValueByName']:
+            continue
+
+        # Get the duedate value and convert it to date object
+        duedate = projectItem["fieldValueByName"]["date"]
+        duedate_obj = datetime.strptime(duedate, "%Y-%m-%d").date()
+
+
+        # Check if the project item is due soon or not
+        if duedate_obj > datetime.now().date():
+            continue
+
+        # Get the list of assignees
+        assignees = issue['assignees']['nodes']
+
+        # Handle notification type
+        if config.notification_type == 'comment':
+            # Prepare the notification content
+            comment = utils.prepare_overdue_issue_comment(
+                issue=issue,
+                assignees=assignees,
+                duedate=duedate_obj
+            )
+
+            if not config.dry_run:
+                # Add the comment to the issue
+                graphql.add_issue_comment(issue['id'], comment)
+
+            logger.info(f'Comment added to issue #{issue["number"]} ({issue["id"]}) with due date on {duedate_obj}')
+        elif config.notification_type == 'email':
+            # Prepare the email content
+            subject, message, to = utils.prepare_overdue_issue_email_message(
+                issue=issue,
+                assignees=assignees,
+                duedate=duedate_obj
+            )
+
+            if not config.dry_run:
+                # Send the email
+                utils.send_email(
+                    from_email=config.smtp_from_email,
+                    to_email=to,
+                    subject=subject,
+                    html_body=message
+                )
+
+            logger.info(f'Email sent to {to} for issue #{issue["number"]} with due date on {duedate_obj}')
 
 def notify_expiring_issues():
     if config.is_enterprise:
@@ -29,6 +116,7 @@ def notify_expiring_issues():
         return
 
     # Get the date for tomorrow
+    today = datetime.now().date()
     tomorrow = datetime.now().date() + timedelta(days=1)
     in_two_days = datetime.now().date() + timedelta(days=2)
 
@@ -58,7 +146,7 @@ def notify_expiring_issues():
 
 
         # Check if the project item is due soon or not
-        if duedate_obj not in (tomorrow, in_two_days):
+        if duedate_obj not in (today,tomorrow, in_two_days):
             continue
 
         # Get the list of assignees
@@ -70,20 +158,20 @@ def notify_expiring_issues():
             comment = utils.prepare_expiring_issue_comment(
                 issue=issue,
                 assignees=assignees,
-                duedate=tomorrow
+                duedate=duedate_obj
             )
 
             if not config.dry_run:
                 # Add the comment to the issue
                 graphql.add_issue_comment(issue['id'], comment)
 
-            logger.info(f'Comment added to issue #{issue["number"]} ({issue["id"]}) with due date on {tomorrow}')
+            logger.info(f'Comment added to issue #{issue["number"]} ({issue["id"]}) with due date on {duedate_obj}')
         elif config.notification_type == 'email':
             # Prepare the email content
             subject, message, to = utils.prepare_expiring_issue_email_message(
                 issue=issue,
                 assignees=assignees,
-                duedate=tomorrow
+                duedate=duedate_obj
             )
 
             if not config.dry_run:
@@ -95,7 +183,7 @@ def notify_expiring_issues():
                     html_body=message
                 )
 
-            logger.info(f'Email sent to {to} for issue #{issue["number"]} with due date on {tomorrow}')
+            logger.info(f'Email sent to {to} for issue #{issue["number"]} with due date on {duedate_obj}')
 
 
 def notify_missing_duedate():

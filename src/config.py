@@ -27,3 +27,5 @@ if notification_type == 'email':
     smtp_username = os.environ['INPUT_SMTP_USERNAME']
     smtp_password = os.environ['INPUT_SMTP_PASSWORD']
     smtp_from_email = os.environ['INPUT_SMTP_FROM_EMAIL']
+    smtp_cc_email = os.environ['INPUT_SMTP_CC_EMAIL']
+
