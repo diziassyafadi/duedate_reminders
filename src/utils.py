@@ -149,35 +149,31 @@ def prepare_overdue_issue_email_message(issue, assignees, duedate):
     return [subject, message, mail_to]
 
 def send_email(from_email: str, to_email: list, subject: str, html_body: str):
+    # Filter invalid/empty emails
+    to_email = [addr.strip() for addr in to_email if addr and addr.strip()]
     if not to_email:
         logger.warning(f"Skipping email '{subject}' because no recipients were provided.")
         return
+    
     smtp_server = smtplib.SMTP(config.smtp_server, config.smtp_port)
     smtp_server.starttls()
     smtp_server.login(config.smtp_username, config.smtp_password)
 
-    # Always CC this address
-    cc_email = config.smtp_cc_email
-
-    # Create the plain text version of the email
-    # text_body = html2text.html2text(html_body)
+    # Always CC this address (if valid)
+    cc_email = config.smtp_cc_email.strip() if getattr(config, "smtp_cc_email", "").strip() else None
 
     message = MIMEMultipart()
     message['From'] = from_email
     message['To'] = ", ".join(to_email)
-    message['Cc'] = cc_email
+    if cc_email:
+        message['Cc'] = cc_email
     message['Subject'] = subject
 
-    # Attach the plain text version
-    # message.attach(MIMEText(text_body, 'plain'))
-
-    # Attach the HTML version
     message.attach(MIMEText(html_body, 'html'))
 
-    recipients = to_email + ([cc_email] if cc_email else [])
+    recipients = to_email[:]
+    if cc_email:
+        recipients.append(cc_email)
 
-    # Send the email
-    text = message.as_string()
-    smtp_server.sendmail(from_email, recipients, text)
-
+    smtp_server.sendmail(from_email, recipients, message.as_string())
     smtp_server.quit()
