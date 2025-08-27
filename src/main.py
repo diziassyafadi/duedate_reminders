@@ -55,6 +55,8 @@ def notify_expiring_issues():
         duedate = projectItem["fieldValueByName"]["date"]
         duedate_obj = datetime.strptime(duedate, "%Y-%m-%d").date()
 
+        logger.info(f'Duedate: {duedate_obj}')
+
         # Check if the project item is due soon or not
         if duedate_obj != tomorrow:
             continue
