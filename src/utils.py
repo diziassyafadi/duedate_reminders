@@ -46,7 +46,7 @@ def prepare_missing_duedate_email_message(issue, assignees):
     """
     Prepare the email message, subject and mail_to addresses
     """
-    subject = f'Re: [{config.repository}] {issue["title"]} (#{issue["number"]})'
+    subject = f"Reminder: Set Due Date for {issue['title']} (#{issue['number']})"
     _assignees = ''
     mail_to = []
     if assignees:
@@ -63,28 +63,42 @@ def prepare_missing_duedate_email_message(issue, assignees):
     return [subject, message, mail_to]
 
 
+from datetime import datetime
+
 def prepare_expiring_issue_email_message(issue, assignees, duedate):
     """
     Prepare the email message, subject and mail_to addresses
     """
-    subject = f'Re: [{config.repository}] {issue["title"]} (#{issue["number"]})'
+    # Calculate remaining days until due date
+    today = datetime.now().date()
+    remaining_days = (duedate - today).days
+
+    subject = f"Reminder: Due in {remaining_days} days for {issue['title']} (#{issue['number']})"
+
     _assignees = ''
     mail_to = []
     if assignees:
         for assignee in assignees:
-            _assignees += f'@{assignee["name"]} '
+            _assignees += f"@{assignee['name']} "
             mail_to.append(assignee['email'])
     else:
-        logger.info(f'No assignees found for issue #{issue["number"]}')
+        logger.info(f"No assignees found for issue #{issue['number']}")
 
-    message = f'Assignees: {_assignees}' \
-              f'<br>The issue is due on: {duedate.strftime("%b %d, %Y")}' \
-              f'<br><br>{issue["url"]}'
+    message = f"""
+    <p>Reminder: The issue <strong>{issue['title']}</strong> (#{issue['number']}) is due in <strong>{remaining_days} days</strong> on <strong>{duedate.strftime('%b %d, %Y')}</strong>.</p>
+    <p>Assignees: {_assignees or 'None'}</p>
+    <p>Please ensure the due date is met.</p>
+    <p><a href="{issue['url']}">View Issue</a></p>
+    """
 
     return [subject, message, mail_to]
 
 
+
 def send_email(from_email: str, to_email: list, subject: str, html_body: str):
+    if not to_email:
+        logger.warning(f"Skipping email '{subject}' because no recipients were provided.")
+        return
     smtp_server = smtplib.SMTP(config.smtp_server, config.smtp_port)
     smtp_server.starttls()
     smtp_server.login(config.smtp_username, config.smtp_password)
