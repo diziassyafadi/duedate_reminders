@@ -30,6 +30,7 @@ def notify_expiring_issues():
 
     # Get the date for tomorrow
     tomorrow = datetime.now().date() + timedelta(days=1)
+    in_two_days = datetime.now().date() + timedelta(days=2)
 
     # Loop through issues
     for issue in issues:
@@ -55,10 +56,9 @@ def notify_expiring_issues():
         duedate = projectItem["fieldValueByName"]["date"]
         duedate_obj = datetime.strptime(duedate, "%Y-%m-%d").date()
 
-        logger.info(f'Duedate: {duedate_obj}')
 
         # Check if the project item is due soon or not
-        if duedate_obj != tomorrow:
+        if duedate_obj not in (tomorrow, in_two_days):
             continue
 
         # Get the list of assignees
