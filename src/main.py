@@ -23,6 +23,8 @@ def notify_expiring_issues():
             duedate_field_name=config.duedate_field_name
         )
 
+    logger.info(issues)
+
     # Check if there are issues available
     if not issues:
         logger.info('No issues has been found')
