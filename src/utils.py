@@ -164,9 +164,9 @@ def send_email(from_email: str, to_email: list, subject: str, html_body: str):
         logger.warning(f"Skipping email '{subject}' because no recipients were provided.")
         return
     
-    smtp_server = smtplib.SMTP(config.smtp_server, config.smtp_port)
-    smtp_server.starttls()
-    smtp_server.login(config.smtp_username, config.smtp_password)
+    # smtp_server = smtplib.SMTP(config.smtp_server, config.smtp_port)
+    # smtp_server.starttls()
+    # smtp_server.login(config.smtp_username, config.smtp_password)
 
     # Always CC this address (if valid)
     cc_email = config.smtp_cc_email.strip() if getattr(config, "smtp_cc_email", "").strip() else None
@@ -183,6 +183,34 @@ def send_email(from_email: str, to_email: list, subject: str, html_body: str):
     recipients = to_email[:]
     if cc_email:
         recipients.append(cc_email)
+    
+    smtp_endpoints = [
+        {"port": 587, "use_ssl": False},  # STARTTLS
+        {"port": 465, "use_ssl": True},   # SSL
+    ]
 
-    smtp_server.sendmail(from_email, recipients, message.as_string())
-    smtp_server.quit()
+    last_error = None
+    for endpoint in smtp_endpoints:
+        try:
+            if endpoint["use_ssl"]:
+                smtp_server = smtplib.SMTP_SSL(config.smtp_server, endpoint["port"])
+            else:
+                smtp_server = smtplib.SMTP(config.smtp_server, endpoint["port"])
+                smtp_server.starttls()
+            smtp_server.login(config.smtp_username, config.smtp_password)
+
+            smtp_server.sendmail(from_email, recipients, message.as_string())
+            smtp_server.quit()
+            logger.info(f"Email '{subject}' sent via port {endpoint['port']}")
+            return  # success → stop trying
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Failed to send via port {endpoint['port']} ({'SSL' if endpoint['use_ssl'] else 'STARTTLS'}): {e}")
+            continue
+
+    # If all failed
+    logger.error(f"Could not send email '{subject}'. Last error: {last_error}")
+    raise last_error
+
+    # smtp_server.sendmail(from_email, recipients, message.as_string())
+    # smtp_server.quit()
