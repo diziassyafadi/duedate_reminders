@@ -14,7 +14,8 @@ def prepare_missing_duedate_comment(issue: dict, assignees: dict):
     comment = ''
     if assignees:
         for assignee in assignees:
-            comment += f'@{assignee["login"]} '
+            if assignee.get("login") and assignee["login"].strip():
+                comment += f'@{assignee["login"]} '
     else:
         logger.info(f'No assignees found for issue #{issue["number"]}')
 
@@ -32,7 +33,8 @@ def prepare_expiring_issue_comment(issue: dict, assignees: dict, duedate):
     comment = ''
     if assignees:
         for assignee in assignees:
-            comment += f'@{assignee["login"]} '
+            if assignee.get("login") and assignee["login"].strip():
+                comment += f'@{assignee["login"]} '
     else:
         logger.info(f'No assignees found for issue #{issue["number"]}')
 
@@ -49,7 +51,8 @@ def prepare_overdue_issue_comment(issue: dict, assignees: dict, duedate):
     comment = ''
     if assignees:
         for assignee in assignees:
-            comment += f'@{assignee["login"]} '
+            if assignee.get("login") and assignee["login"].strip():
+                comment += f'@{assignee["login"]} '
     else:
         logger.info(f'No assignees found for issue #{issue["number"]}')
 
@@ -62,13 +65,15 @@ def prepare_missing_duedate_email_message(issue, assignees):
     """
     Prepare the email message, subject and mail_to addresses
     """
-    subject = f"Reminder: Set Due Date for {issue['title']} (#{issue['number']})"
+    subject = f"[Reminder: Set Due Date] {issue['title']} (#{issue['number']})"
     _assignees = ''
     mail_to = []
     if assignees:
         for assignee in assignees:
-            _assignees += f'@{assignee["name"]} '
-            mail_to.append(assignee['email'])
+            if assignee.get("name") and assignee["name"].strip():
+                _assignees += f'@{assignee["name"]} '
+            if assignee.get('email') and assignee['email'].strip():
+                mail_to.append(assignee['email'])
     else:
         logger.info(f'No assignees found for issue #{issue["number"]}')
 
@@ -91,18 +96,20 @@ def prepare_expiring_issue_email_message(issue, assignees, duedate):
 
     # if remaining_days is 0, then it is due today
     if remaining_days == 0:
-        subject = f"Reminder: Due today for {issue['title']} (#{issue['number']})"
+        subject = f"[Reminder: Due today] {issue['title']} (#{issue['number']})"
     elif remaining_days == 1:
-        subject = f"Reminder: Due tomorrow for {issue['title']} (#{issue['number']})"
+        subject = f"[Reminder: Due tomorrow] {issue['title']} (#{issue['number']})"
     else:
-        subject = f"Reminder: Due in {remaining_days} days for {issue['title']} (#{issue['number']})"
+        subject = f"[Reminder: Due in {remaining_days} days] {issue['title']} (#{issue['number']})"
 
     _assignees = ''
     mail_to = []
     if assignees:
         for assignee in assignees:
-            _assignees += f"@{assignee['name']} "
-            mail_to.append(assignee['email'])
+            if assignee.get('name') and assignee['name'].strip():
+                _assignees += f"@{assignee['name']} "
+            if assignee.get('email') and assignee['email'].strip():
+                mail_to.append(assignee['email'])
     else:
         logger.info(f"No assignees found for issue #{issue['number']}")
 
@@ -116,7 +123,7 @@ def prepare_expiring_issue_email_message(issue, assignees, duedate):
 
     message = f"""
     <p>Reminder: The issue <strong>{issue['title']}</strong> (#{issue['number']}) {due_text} on <strong>{duedate.strftime('%b %d, %Y')}</strong>.</p>
-    <p>Assignees: {_assignees or 'None'}</p>
+    <p>Assignees: {_assignees.strip() if _assignees.strip() else 'No assignees'}</p>
     <p>Please ensure the due date is met.</p>
     <p><a href="{issue['url']}">View Issue</a></p>
     """
@@ -128,20 +135,22 @@ def prepare_overdue_issue_email_message(issue, assignees, duedate):
     Prepare the email message, subject and mail_to addresses
     """
 
-    subject = f"Reminder: Overdue for {issue['title']} (#{issue['number']})"
+    subject = f"[Reminder: Overdue Issue] {issue['title']} (#{issue['number']})"
     
     _assignees = ''
     mail_to = []
     if assignees:
         for assignee in assignees:
-            _assignees += f"@{assignee['name']} "
-            mail_to.append(assignee['email'])
+            if assignee.get('name') and assignee['name'].strip():
+                _assignees += f"@{assignee['name']} "
+            if assignee.get('email') and assignee['email'].strip():
+                mail_to.append(assignee['email'])
     else:
         logger.info(f"No assignees found for issue #{issue['number']}")
 
     message = f"""
     <p>Reminder: The issue <strong>{issue['title']}</strong> (#{issue['number']}) is overdue since <strong>{duedate.strftime('%b %d, %Y')}</strong>.</p>
-    <p>Assignees: {_assignees or 'None'}</p>
+    <p>Assignees: {_assignees.strip() if _assignees.strip() else 'No assignees'}</p>
     <p>Please ensure the issue is completed.</p>
     <p><a href="{issue['url']}">View Issue</a></p>
     """
