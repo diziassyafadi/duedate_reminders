@@ -56,6 +56,18 @@ def notify_overdue_issues():
         if duedate_obj > datetime.now().date():
             continue
 
+        # --- Get status ---
+        status_value = None
+        if projectItem.get("fieldValuesByName"):
+            status_field = projectItem["fieldValuesByName"].get("Status")
+            if status_field:
+                status_value = status_field.get("name")
+
+        # --- Check if the status is "Done" ---
+        if status_value not in ("In Progress", "In review"):
+            continue
+
+
         # Get the list of assignees
         assignees = issue['assignees']['nodes']
 
@@ -149,6 +161,17 @@ def notify_expiring_issues():
         if duedate_obj not in (today,tomorrow, in_two_days):
             continue
 
+        # --- Get status ---
+        status_value = None
+        if projectItem.get("fieldValuesByName"):
+            status_field = projectItem["fieldValuesByName"].get("Status")
+            if status_field:
+                status_value = status_field.get("name")
+
+        # --- Check if the status is "Done" ---
+        if status_value not in ("In Progress", "In review"):
+            continue
+        
         # Get the list of assignees
         assignees = issue['assignees']['nodes']
 
@@ -204,6 +227,18 @@ def notify_missing_duedate():
         # if projectItem['id'] != 'MDEzOlByb2plY3RWMkl0ZW0xMzMxOA==':
         #     continue
         issue = projectItem['content']
+        logger.info(issue)
+
+        # --- Get status ---
+        status_value = None
+        if projectItem.get("fieldValuesByName"):
+            status_field = projectItem["fieldValuesByName"].get("Status")
+            if status_field:
+                status_value = status_field.get("name")
+
+        # Skip if status not allowed
+        if status_value not in ("In Progress", "In review"):
+            continue
 
         # Get the list of assignees
         assignees = issue['assignees']['nodes']
