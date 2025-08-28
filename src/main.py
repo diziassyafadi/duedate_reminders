@@ -7,23 +7,39 @@ import graphql
 ALLOWED_STATUSES = ("In Progress", "In review")
 
 
+def extract_field_values(project_item):
+    """Normalize project field values into a dict {field_name: value_dict}."""
+    values = {}
+
+    # Enterprise projects expose fieldValuesByName directly
+    if project_item.get("fieldValuesByName"):
+        for field_name, field_value in project_item["fieldValuesByName"].items():
+            values[field_name] = field_value
+
+    # Repo issues expose fieldValues (nodes with field + value)
+    elif project_item.get("fieldValues"):
+        for node in project_item["fieldValues"]["nodes"]:
+            field_name = node.get("field", {}).get("name")
+            if not field_name:
+                continue
+            values[field_name] = node
+
+    # Legacy repo query still gives fieldValueByName
+    elif project_item.get("fieldValueByName"):
+        # single field at a time, wrap it
+        # for backward compatibility with existing repo queries
+        # note: only handles Status + duedate fields
+        values["Status"] = project_item.get("fieldValueByName", {}).get("Status")
+        values[config.duedate_field_name] = project_item.get("fieldValueByName")
+
+    return values
+
+
 def get_status(project_item):
     """Extract the Status field value from a project item."""
-    status_value = None
-
-    # Enterprise / project-based query
-    if project_item.get("fieldValuesByName"):
-        status_field = project_item["fieldValuesByName"].get("Status")
-        if status_field:
-            status_value = status_field.get("name")
-
-    # Repo-based query
-    elif project_item.get("fieldValueByName"):
-        status_field = project_item["fieldValueByName"].get("Status")
-        if status_field:
-            status_value = status_field.get("name")
-
-    return status_value
+    fields = extract_field_values(project_item)
+    status_field = fields.get("Status")
+    return status_field.get("name") if status_field else None
 
 
 def should_notify(project_item):
@@ -65,18 +81,23 @@ def notify_overdue_issues():
         )
     )
 
+    logger.info(f"Overdue issues: {issues}") # TODO: remove this
+
     if not issues:
         logger.info("No issues have been found")
         return
 
     for issue in issues:
         project_item, issue = extract_project_item(issue)
-        if not project_item or not project_item.get("fieldValueByName"):
+        if not project_item:
             continue
 
-        duedate = project_item["fieldValueByName"]["date"]
-        duedate_obj = datetime.strptime(duedate, "%Y-%m-%d").date()
+        fields = extract_field_values(project_item)
+        duedate_field = fields.get(config.duedate_field_name)
+        if not duedate_field or not duedate_field.get("date"):
+            continue
 
+        duedate_obj = datetime.strptime(duedate_field["date"], "%Y-%m-%d").date()
         if duedate_obj > datetime.now().date():
             continue
         if not should_notify(project_item):
@@ -112,6 +133,8 @@ def notify_expiring_issues():
         )
     )
 
+    logger.info(f"Expiring issues: {issues}") # TODO: remove this
+
     if not issues:
         logger.info("No issues have been found")
         return
@@ -121,12 +144,15 @@ def notify_expiring_issues():
 
     for issue in issues:
         project_item, issue = extract_project_item(issue)
-        if not project_item or not project_item.get("fieldValueByName"):
+        if not project_item:
             continue
 
-        duedate = project_item["fieldValueByName"]["date"]
-        duedate_obj = datetime.strptime(duedate, "%Y-%m-%d").date()
+        fields = extract_field_values(project_item)
+        duedate_field = fields.get(config.duedate_field_name)
+        if not duedate_field or not duedate_field.get("date"):
+            continue
 
+        duedate_obj = datetime.strptime(duedate_field["date"], "%Y-%m-%d").date()
         if duedate_obj not in upcoming:
             continue
         if not should_notify(project_item):
@@ -154,6 +180,8 @@ def notify_missing_duedate():
         filters={"empty_duedate": True, "open_only": True},
     )
 
+    logger.info(f"Missing duedate issues: {issues}") # TODO: remove this
+
     if not issues:
         logger.info("No issues have been found")
         return
@@ -161,6 +189,10 @@ def notify_missing_duedate():
     for project_item in issues:
         issue = project_item["content"]
 
+        fields = extract_field_values(project_item)
+        duedate_field = fields.get(config.duedate_field_name)
+        if duedate_field and duedate_field.get("date"):
+            continue
         if not should_notify(project_item):
             continue
 
