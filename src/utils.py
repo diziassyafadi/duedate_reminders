@@ -200,7 +200,7 @@ def send_email(from_email: str, to_email: list, subject: str, html_body: str):
             smtp_server.login(config.smtp_username, config.smtp_password)
 
             smtp_server.sendmail(from_email, recipients, message.as_string())
-            smtp_server.quit()
+            smtp_server.close()
             logger.info(f"Email '{subject}' sent via port {endpoint['port']}")
             return  # success → stop trying
         except Exception as e:
