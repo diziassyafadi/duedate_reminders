@@ -171,19 +171,21 @@ def send_email(from_email: str, to_email: list, subject: str, html_body: str):
     # Always CC this address (if valid)
     cc_email = config.smtp_cc_email.strip() if getattr(config, "smtp_cc_email", "").strip() else None
 
+    # Create the message
     message = MIMEMultipart()
     message['From'] = from_email
     message['To'] = ", ".join(to_email)
     if cc_email:
-        message['Bcc'] = cc_email
+        message['Cc'] = cc_email
     message['Subject'] = subject
-
     message.attach(MIMEText(html_body, 'html'))
 
+    # Build recipients list
     recipients = to_email[:]
     if cc_email:
         recipients.append(cc_email)
-    
+
+    # SMTP endpoints to try
     smtp_endpoints = [
         {"port": 587, "use_ssl": False},  # STARTTLS
         {"port": 465, "use_ssl": True},   # SSL
@@ -191,26 +193,36 @@ def send_email(from_email: str, to_email: list, subject: str, html_body: str):
 
     last_error = None
     for endpoint in smtp_endpoints:
+        smtp_server = None
         try:
             if endpoint["use_ssl"]:
-                smtp_server = smtplib.SMTP_SSL(config.smtp_server, endpoint["port"])
+                smtp_server = smtplib.SMTP_SSL(config.smtp_server, endpoint["port"], timeout=10)
             else:
-                smtp_server = smtplib.SMTP(config.smtp_server, endpoint["port"])
-                smtp_server.starttls()
-            smtp_server.login(config.smtp_username, config.smtp_password)
+                smtp_server = smtplib.SMTP(config.smtp_server, endpoint["port"], timeout=10)
+                try:
+                    smtp_server.starttls()
+                except Exception as e:
+                    logger.warning(f"STARTTLS failed on port {endpoint['port']}: {e}")
+                    continue
 
+            smtp_server.login(config.smtp_username, config.smtp_password)
             smtp_server.sendmail(from_email, recipients, message.as_string())
-            smtp_server.close()
             logger.info(f"Email '{subject}' sent via port {endpoint['port']}")
             return  # success → stop trying
+
         except Exception as e:
             last_error = e
             logger.warning(f"Failed to send via port {endpoint['port']} ({'SSL' if endpoint['use_ssl'] else 'STARTTLS'}): {e}")
-            continue
 
-    # If all failed
+        finally:
+            if smtp_server:
+                try:
+                    smtp_server.close()
+                except Exception:
+                    pass
+
+    # If all endpoints failed
     logger.error(f"Could not send email '{subject}'. Last error: {last_error}")
-    raise last_error
 
     # smtp_server.sendmail(from_email, recipients, message.as_string())
     # smtp_server.quit()

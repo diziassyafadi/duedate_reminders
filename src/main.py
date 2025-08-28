@@ -3,6 +3,7 @@ from logger import logger
 import config
 import utils
 import graphql
+import time
 
 ALLOWED_STATUSES = ("In Progress", "In review")
 
@@ -99,6 +100,8 @@ def notify_expiring_issues():
                     subject=subject,
                     html_body=message
                 )
+                # Rate limit the email sending
+                time.sleep(2)
 
             logger.info(f'Email sent to {to} for issue #{issue["number"]} with due date on {duedate_obj}')
 
@@ -155,6 +158,9 @@ def notify_missing_duedate():
                     subject=subject,
                     html_body=message
                 )
+                # Rate limit the email sending
+                time.sleep(2)
+
             logger.info(f'Email sent to {to} for issue #{issue["number"]}')
 
 
@@ -246,6 +252,8 @@ def notify_overdue_issues():
                     subject=subject,
                     html_body=message
                 )
+                # Rate limit the email sending
+                time.sleep(2)
 
             logger.info(f'Email sent to {to} for issue #{issue["number"]} with due date on {duedate_obj}')
 
