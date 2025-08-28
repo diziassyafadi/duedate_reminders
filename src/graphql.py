@@ -6,7 +6,7 @@ import config
 
 def get_repo_issues(owner, repository, duedate_field_name, after=None, issues=None):
     query = """
-    query GetRepoIssues($owner: String!, $repo: String!, $duedate: String!, $after: String) {
+    query GetRepoIssues($owner: String!, $repo: String!, $after: String) {
       repository(owner: $owner, name: $repo) {
         issues(first: 100, after: $after, states: [OPEN]) {
           nodes {
@@ -27,16 +27,16 @@ def get_repo_issues(owner, repository, duedate_field_name, after=None, issues=No
                   number
                   title
                 }
-                fieldValueByName(name: $duedate) {
-                  ... on ProjectV2ItemFieldDateValue {
-                    id
-                    date
-                  }
-                }
-                fieldValueByName(name: "Status") {
-                  ... on ProjectV2ItemFieldSingleSelectValue {
-                    id
-                    name
+                fieldValues(first: 20) {
+                  nodes {
+                    ... on ProjectV2ItemFieldDateValue {
+                      field { ... on ProjectV2FieldCommon { name } }
+                      date
+                    }
+                    ... on ProjectV2ItemFieldSingleSelectValue {
+                      field { ... on ProjectV2FieldCommon { name } }
+                      name
+                    }
                   }
                 }
               }
@@ -45,7 +45,6 @@ def get_repo_issues(owner, repository, duedate_field_name, after=None, issues=No
           pageInfo {
             endCursor
             hasNextPage
-            hasPreviousPage
           }
           totalCount
         }
@@ -56,7 +55,6 @@ def get_repo_issues(owner, repository, duedate_field_name, after=None, issues=No
     variables = {
         'owner': owner,
         'repo': repository,
-        'duedate': duedate_field_name,
         'after': after
     }
 
@@ -69,31 +67,25 @@ def get_repo_issues(owner, repository, duedate_field_name, after=None, issues=No
     if response.json().get('errors'):
         print(response.json().get('errors'))
 
-    pageinfo = (
-        response.json()
-        .get('data')
-        .get('repository')
-        .get('issues')
-        .get('pageInfo')
-    )
+    repo_data = response.json().get("data", {}).get("repository", {})
+    if not repo_data:
+        return []
+
+    issues_nodes = repo_data.get("issues", {}).get("nodes", [])
+    pageinfo = repo_data.get("issues", {}).get("pageInfo", {})
+
     if issues is None:
         issues = []
 
-    issues = issues + (
-        response.json()
-        .get('data')
-        .get('repository')
-        .get('issues')
-        .get('nodes')
-    )
+    issues.extend(issues_nodes)
 
-    if pageinfo.get('hasNextPage'):
+    if pageinfo.get("hasNextPage"):
         return get_repo_issues(
             owner=owner,
             repository=repository,
-            after=pageinfo.get('endCursor'),
-            issues=issues,
-            duedate_field_name=duedate_field_name
+            duedate_field_name=duedate_field_name,
+            after=pageinfo.get("endCursor"),
+            issues=issues
         )
 
     return issues
