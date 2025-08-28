@@ -166,7 +166,7 @@ def send_email(from_email: str, to_email: list, subject: str, html_body: str):
     message['From'] = from_email
     message['To'] = ", ".join(to_email)
     if cc_email:
-        message['Cc'] = cc_email
+        message['Bcc'] = cc_email
     message['Subject'] = subject
 
     message.attach(MIMEText(html_body, 'html'))
