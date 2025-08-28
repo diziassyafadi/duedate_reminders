@@ -18,7 +18,7 @@ notify_for = os.environ['INPUT_NOTIFY_FOR']
 if notification_type not in ['comment', 'email']:
     raise Exception(f'Unsupported notification type {notification_type}')
 
-if notify_for not in ['expiring_issues', 'missing_duedate']:
+if notify_for not in ['expiring_issues', 'missing_duedate', 'overdue_issues']:
     raise Exception(f'Unsupported notify_for value {notification_type}')
 
 if notification_type == 'email':
