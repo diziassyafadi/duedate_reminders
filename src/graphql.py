@@ -7,44 +7,50 @@ import config
 def get_repo_issues(owner, repository, duedate_field_name, after=None, issues=None):
     query = """
     query GetRepoIssues($owner: String!, $repo: String!, $duedate: String!, $after: String) {
-          repository(owner: $owner, name: $repo) {
-            issues(first: 100, after: $after, states: [OPEN]) {
+      repository(owner: $owner, name: $repo) {
+        issues(first: 100, after: $after, states: [OPEN]) {
+          nodes {
+            id
+            title
+            number
+            url
+            assignees(first:100) {
               nodes {
-                id
-                title
-                number
-                url
-                assignees(first:100) {
-                  nodes {
+                name
+                email
+                login
+              }
+            }
+            projectItems(first: 10) {
+              nodes {
+                project {
+                  number
+                  title
+                }
+                fieldValueByName(name: $duedate) {
+                  ... on ProjectV2ItemFieldDateValue {
+                    id
+                    date
+                  }
+                }
+                fieldValueByName(name: "Status") {
+                  ... on ProjectV2ItemFieldSingleSelectValue {
+                    id
                     name
-                    email
-                    login
-                  }
-                }
-                projectItems(first: 10) {
-                  nodes {
-                    project {
-                      number
-                      title
-                    }
-                    fieldValueByName(name: $duedate) {
-                      ... on ProjectV2ItemFieldDateValue {
-                        id
-                        date
-                      }
-                    }
                   }
                 }
               }
-              pageInfo {
-                endCursor
-                hasNextPage
-                hasPreviousPage
-              }
-              totalCount
             }
           }
+          pageInfo {
+            endCursor
+            hasNextPage
+            hasPreviousPage
+          }
+          totalCount
         }
+      }
+    }
     """
 
     variables = {
@@ -63,10 +69,24 @@ def get_repo_issues(owner, repository, duedate_field_name, after=None, issues=No
     if response.json().get('errors'):
         print(response.json().get('errors'))
 
-    pageinfo = response.json().get('data').get('repository').get('issues').get('pageInfo')
+    pageinfo = (
+        response.json()
+        .get('data')
+        .get('repository')
+        .get('issues')
+        .get('pageInfo')
+    )
     if issues is None:
         issues = []
-    issues = issues + response.json().get('data').get('repository').get('issues').get('nodes')
+
+    issues = issues + (
+        response.json()
+        .get('data')
+        .get('repository')
+        .get('issues')
+        .get('nodes')
+    )
+
     if pageinfo.get('hasNextPage'):
         return get_repo_issues(
             owner=owner,
@@ -79,50 +99,57 @@ def get_repo_issues(owner, repository, duedate_field_name, after=None, issues=No
     return issues
 
 
+
 def get_project_issues(owner, owner_type, project_number, duedate_field_name, filters=None, after=None, issues=None):
     query = f"""
     query GetProjectIssues($owner: String!, $projectNumber: Int!, $duedate: String!, $after: String)  {{
-          {owner_type}(login: $owner) {{
-            projectV2(number: $projectNumber) {{
+      {owner_type}(login: $owner) {{
+        projectV2(number: $projectNumber) {{
+          id
+          title
+          number
+          items(first: 100, after: $after) {{
+            nodes {{
               id
-              title
-              number
-              items(first: 100,after: $after) {{
-                nodes {{
+              fieldValueByName(name: $duedate) {{
+                ... on ProjectV2ItemFieldDateValue {{
                   id
-                  fieldValueByName(name: $duedate) {{
-                    ... on ProjectV2ItemFieldDateValue {{
-                      id
-                      date
-                    }}
-                  }}
-                  content {{
-                    ... on Issue {{
-                      id
-                      title
-                      number
-                      state
-                      url
-                      assignees(first:20) {{
-                        nodes {{
-                          name
-                          email
-                          login
-                        }}
-                      }}
+                  date
+                }}
+              }}
+              fieldValueByName(name: "Status") {{
+                ... on ProjectV2ItemFieldSingleSelectValue {{
+                  id
+                  name
+                }}
+              }}
+              content {{
+                ... on Issue {{
+                  id
+                  title
+                  number
+                  state
+                  url
+                  assignees(first:20) {{
+                    nodes {{
+                      name
+                      email
+                      login
                     }}
                   }}
                 }}
-                pageInfo {{
-                endCursor
-                hasNextPage
-                hasPreviousPage
-              }}
-              totalCount
               }}
             }}
+            pageInfo {{
+              endCursor
+              hasNextPage
+              hasPreviousPage
+            }}
+            totalCount
           }}
         }}
+      }}
+    }}
     """
 
     variables = {
@@ -141,11 +168,25 @@ def get_project_issues(owner, owner_type, project_number, duedate_field_name, fi
     if response.json().get('errors'):
         print(response.json().get('errors'))
 
-    pageinfo = response.json().get('data').get(owner_type).get('projectV2').get('items').get('pageInfo')
+    pageinfo = (
+        response.json()
+        .get('data')
+        .get(owner_type)
+        .get('projectV2')
+        .get('items')
+        .get('pageInfo')
+    )
     if issues is None:
         issues = []
 
-    nodes = response.json().get('data').get(owner_type).get('projectV2').get('items').get('nodes')
+    nodes = (
+        response.json()
+        .get('data')
+        .get(owner_type)
+        .get('projectV2')
+        .get('items')
+        .get('nodes')
+    )
 
     if filters:
         filtered_issues = []
@@ -154,8 +195,12 @@ def get_project_issues(owner, owner_type, project_number, duedate_field_name, fi
                 continue
             if filters.get('empty_duedate') and node['fieldValueByName']:
                 continue
+            if filters.get('status') and (
+                not node.get('fieldValueByName') or
+                node['fieldValueByName'].get('name') != filters['status']
+            ):
+                continue
             filtered_issues.append(node)
-
         nodes = filtered_issues
 
     issues = issues + nodes
@@ -172,6 +217,7 @@ def get_project_issues(owner, owner_type, project_number, duedate_field_name, fi
         )
 
     return issues
+
 
 
 def add_issue_comment(issueId, comment):
