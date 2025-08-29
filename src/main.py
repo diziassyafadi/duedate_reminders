@@ -23,87 +23,88 @@ def notify_expiring_issues():
             duedate_field_name=config.duedate_field_name,
         )
 
-    # Check if there are issues available
-    if not issues:
-        logger.info('No issues has been found')
-        return
+    print(issues)
+    # # Check if there are issues available
+    # if not issues:
+    #     logger.info('No issues has been found')
+    #     return
 
-    # Get the date for tomorrow
-    today = datetime.now().date()
-    upcoming = {today, today + timedelta(days=1), today + timedelta(days=2)}
+    # # Get the date for tomorrow
+    # today = datetime.now().date()
+    # upcoming = {today, today + timedelta(days=1), today + timedelta(days=2)}
 
-    # Loop through issues
-    for issue in issues:
-        if config.is_enterprise:
-            projectItem = issue
-            issue = issue['content']
-        else:
-            projectNodes = issue['projectItems']['nodes']
+    # # Loop through issues
+    # for issue in issues:
+    #     if config.is_enterprise:
+    #         projectItem = issue
+    #         issue = issue['content']
+    #     else:
+    #         projectNodes = issue['projectItems']['nodes']
 
-            # If no project is assigned to the
-            if not projectNodes:
-                continue
+    #         # If no project is assigned to the
+    #         if not projectNodes:
+    #             continue
 
-            # Check if the desire project is assigned to the issue
-            projectItem = next((entry for entry in projectNodes if entry['project']['number'] == config.project_number),
-                               None)
+    #         # Check if the desire project is assigned to the issue
+    #         projectItem = next((entry for entry in projectNodes if entry['project']['number'] == config.project_number),
+    #                            None)
 
-        # The fieldValueByName contains the date for the DueDate Field
-        if not projectItem['fieldValueByName']:
-            continue
+    #     # The fieldValueByName contains the date for the DueDate Field
+    #     if not projectItem['fieldValueByName']:
+    #         continue
 
-        # Get the duedate value and convert it to date object
-        duedate = projectItem["fieldValueByName"]["date"]
-        duedate_obj = datetime.strptime(duedate, "%Y-%m-%d").date()
+    #     # Get the duedate value and convert it to date object
+    #     duedate = projectItem["fieldValueByName"]["date"]
+    #     duedate_obj = datetime.strptime(duedate, "%Y-%m-%d").date()
 
-        # Get the status value
-        status = projectItem["statusField"]["name"]
+    #     # Get the status value
+    #     status = projectItem["statusField"]["name"]
 
-        # Check if the project item is due soon or not
-        if duedate_obj not in upcoming:
-            continue
+    #     # Check if the project item is due soon or not
+    #     if duedate_obj not in upcoming:
+    #         continue
 
-        # Check if the status is in the allowed statuses
-        if status not in ALLOWED_STATUSES:
-            continue
+    #     # Check if the status is in the allowed statuses
+    #     if status not in ALLOWED_STATUSES:
+    #         continue
 
-        # Get the list of assignees
-        assignees = issue['assignees']['nodes']
+    #     # Get the list of assignees
+    #     assignees = issue['assignees']['nodes']
 
-        # Handle notification type
-        if config.notification_type == 'comment':
-            # Prepare the notification content
-            comment = utils.prepare_expiring_issue_comment(
-                issue=issue,
-                assignees=assignees,
-                duedate=duedate_obj
-            )
+    #     # Handle notification type
+    #     if config.notification_type == 'comment':
+    #         # Prepare the notification content
+    #         comment = utils.prepare_expiring_issue_comment(
+    #             issue=issue,
+    #             assignees=assignees,
+    #             duedate=duedate_obj
+    #         )
 
-            if not config.dry_run:
-                # Add the comment to the issue
-                graphql.add_issue_comment(issue['id'], comment)
+    #         if not config.dry_run:
+    #             # Add the comment to the issue
+    #             graphql.add_issue_comment(issue['id'], comment)
 
-            logger.info(f'Comment added to issue #{issue["number"]} ({issue["id"]}) with due date on {duedate_obj}')
-        elif config.notification_type == 'email':
-            # Prepare the email content
-            subject, message, to = utils.prepare_expiring_issue_email_message(
-                issue=issue,
-                assignees=assignees,
-                duedate=duedate_obj
-            )
+    #         logger.info(f'Comment added to issue #{issue["number"]} ({issue["id"]}) with due date on {duedate_obj}')
+    #     elif config.notification_type == 'email':
+    #         # Prepare the email content
+    #         subject, message, to = utils.prepare_expiring_issue_email_message(
+    #             issue=issue,
+    #             assignees=assignees,
+    #             duedate=duedate_obj
+    #         )
 
-            if not config.dry_run:
-                # Send the email
-                utils.send_email(
-                    from_email=config.smtp_from_email,
-                    to_email=to,
-                    subject=subject,
-                    html_body=message
-                )
-                # Rate limit the email sending
-                time.sleep(2)
+    #         if not config.dry_run:
+    #             # Send the email
+    #             utils.send_email(
+    #                 from_email=config.smtp_from_email,
+    #                 to_email=to,
+    #                 subject=subject,
+    #                 html_body=message
+    #             )
+    #             # Rate limit the email sending
+    #             time.sleep(2)
 
-            logger.info(f'Email sent to {to} for issue #{issue["number"]} with due date on {duedate_obj}')
+    #         logger.info(f'Email sent to {to} for issue #{issue["number"]} with due date on {duedate_obj}')
 
 
 def notify_missing_duedate():
