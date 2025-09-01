@@ -8,20 +8,30 @@ import time
 ALLOWED_STATUSES = ("In Progress", "In review")
 
 def notify_expiring_issues():
-    if config.is_enterprise:
-        issues = graphql.get_project_issues(
-            owner=config.repository_owner,
-            owner_type=config.repository_owner_type,
-            project_number=config.project_number,
-            duedate_field_name=config.duedate_field_name,
-            filters={'open_only': True}
-        )
-    else:
-        issues = graphql.get_repo_issues(
-            owner=config.repository_owner,
-            repository=config.repository_name,
-            duedate_field_name=config.duedate_field_name,
-        )
+    # if config.is_enterprise:
+    #     issues = graphql.get_project_issues(
+    #         owner=config.repository_owner,
+    #         owner_type=config.repository_owner_type,
+    #         project_number=config.project_number,
+    #         duedate_field_name=config.duedate_field_name,
+    #         filters={'open_only': True}
+    #     )
+    # else:
+    #     issues = graphql.get_repo_issues(
+    #         owner=config.repository_owner,
+    #         repository=config.repository_name,
+    #         duedate_field_name=config.duedate_field_name,
+    #     )
+
+    issues = graphql.get_project_issues(
+        owner=config.repository_owner,
+        owner_type=config.repository_owner_type,
+        project_number=config.project_number,
+        duedate_field_name=config.duedate_field_name,
+        filters={'open_only': True}
+    )
+
+    logger.info(f'Issues: {issues}')
 
     # Check if there are issues available
     if not issues:
@@ -34,19 +44,21 @@ def notify_expiring_issues():
 
     # Loop through issues
     for issue in issues:
-        if config.is_enterprise:
-            projectItem = issue
-            issue = issue['content']
-        else:
-            projectNodes = issue['projectItems']['nodes']
+        projectItem = issue
+        issue = issue['content']
+        # if config.is_enterprise:
+            # projectItem = issue
+            # issue = issue['content']
+        # else:
+        #     projectNodes = issue['projectItems']['nodes']
 
-            # If no project is assigned to the
-            if not projectNodes:
-                continue
+        #     # If no project is assigned to the
+        #     if not projectNodes:
+        #         continue
 
-            # Check if the desire project is assigned to the issue
-            projectItem = next((entry for entry in projectNodes if entry['project']['number'] == config.project_number),
-                               None)
+        #     # Check if the desire project is assigned to the issue
+        #     projectItem = next((entry for entry in projectNodes if entry['project']['number'] == config.project_number),
+        #                        None)
 
         # The fieldValueByName contains the date for the DueDate Field
         if not projectItem['fieldValueByName']:
@@ -115,6 +127,8 @@ def notify_missing_duedate():
         duedate_field_name=config.duedate_field_name,
         filters={'empty_duedate': True, 'open_only': True}
     )
+
+    logger.info(f'Issues: {issues}')
 
     # Check if there are issues available
     if not issues:
