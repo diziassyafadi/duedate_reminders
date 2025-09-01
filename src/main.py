@@ -31,7 +31,6 @@ def notify_expiring_issues():
         filters={'open_only': True}
     )
 
-    logger.info(f'Issues: {issues}')
 
     # Check if there are issues available
     if not issues:
@@ -127,8 +126,6 @@ def notify_missing_duedate():
         duedate_field_name=config.duedate_field_name,
         filters={'empty_duedate': True, 'open_only': True}
     )
-
-    logger.info(f'Issues: {issues}')
 
     # Check if there are issues available
     if not issues:
