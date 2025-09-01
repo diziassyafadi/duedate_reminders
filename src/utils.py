@@ -76,9 +76,12 @@ def prepare_missing_duedate_email_message(issue, assignees):
     else:
         logger.info(f'No assignees found for issue #{issue["number"]}')
 
-    message = f'Assignees: {_assignees}' \
-              f'<br>Kindly set the due date for this issue.' \
-              f'<br><br>{issue["url"]}'
+    message = f"""
+    <p>Reminder: The issue <strong>{issue['title']}</strong> (#{issue['number']}) has no due date.</p>
+    <p>Assignees: {_assignees.strip() if _assignees.strip() else 'No assignees'}</p>
+    <p>Kindly set the due date for this issue.</p>
+    <p><a href="{issue['url']}">View Issue</a></p>
+    """
 
     return [subject, message, mail_to]
 
