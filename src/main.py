@@ -103,7 +103,8 @@ def notify_expiring_issues():
                 # Rate limit the email sending
                 time.sleep(2)
 
-            logger.info(f'Email sent to {to} for issue #{issue["number"]} with due date on {duedate_obj}')
+            if to:
+                logger.info(f'Email sent to {to} for issue #{issue["number"]} with due date on {duedate_obj}')
 
 
 def notify_missing_duedate():

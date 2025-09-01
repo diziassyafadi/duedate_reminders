@@ -1,5 +1,4 @@
 import smtplib
-import html2text
 import config
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -161,12 +160,8 @@ def send_email(from_email: str, to_email: list, subject: str, html_body: str):
     # Filter invalid/empty emails
     to_email = [addr.strip() for addr in to_email if addr and addr.strip()]
     if not to_email:
-        logger.warning(f"Skipping email '{subject}' because no recipients were provided.")
-        return
-    
-    # smtp_server = smtplib.SMTP(config.smtp_server, config.smtp_port)
-    # smtp_server.starttls()
-    # smtp_server.login(config.smtp_username, config.smtp_password)
+        logger.warning(f"'{subject}' email not sent because no recipients were provided. Sending to {config.smtp_cc_email}")
+        to_email = [config.smtp_cc_email]
 
     # Always CC this address (if valid)
     cc_email = config.smtp_cc_email.strip() if getattr(config, "smtp_cc_email", "").strip() else None
@@ -223,6 +218,3 @@ def send_email(from_email: str, to_email: list, subject: str, html_body: str):
 
     # If all endpoints failed
     logger.error(f"Could not send email '{subject}'. Last error: {last_error}")
-
-    # smtp_server.sendmail(from_email, recipients, message.as_string())
-    # smtp_server.quit()
