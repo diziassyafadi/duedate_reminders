@@ -140,8 +140,8 @@ def prepare_overdue_issue_email_message(issue, assignees, duedate):
     mail_to = []
     if assignees:
         for assignee in assignees:
-            if assignee.get('name') and assignee['name'].strip():
-                _assignees += f"@{assignee['name']} "
+            if assignee.get('login') and assignee['login'].strip():
+                _assignees += f"@{assignee['login']} "
             if assignee.get('email') and assignee['email'].strip():
                 mail_to.append(assignee['email'])
     else:
