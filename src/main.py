@@ -143,8 +143,8 @@ def notify_missing_duedate():
         if status not in ALLOWED_STATUSES:
             continue
 
-        # filter no due date
-        if not projectItem['fieldValueByName']:
+        # filter if there is due date
+        if projectItem['fieldValueByName']:
             continue
         
         if config.notification_type == 'comment':
