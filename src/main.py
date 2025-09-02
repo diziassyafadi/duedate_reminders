@@ -228,7 +228,7 @@ def notify_overdue_issues():
         status = projectItem["statusField"]["name"]
 
         # Check if the project item is overdue or not
-        if duedate_obj > today:
+        if duedate_obj >= today:
             continue
 
         # Check if the status is in the allowed statuses
