@@ -139,6 +139,9 @@ def notify_missing_duedate():
         assignees = issue['assignees']['nodes']
 
         #  filter status
+        if not projectItem['statusField']:
+            continue
+        
         status = projectItem['statusField']['name']
         if status not in ALLOWED_STATUSES:
             continue
@@ -217,7 +220,7 @@ def notify_overdue_issues():
         #                        None)
 
         # The fieldValueByName contains the date for the DueDate Field
-        if not projectItem['fieldValueByName']:
+        if not projectItem['fieldValueByName'] or not projectItem['statusField']:
             continue
 
         # Get the duedate value and convert it to date object
@@ -225,6 +228,8 @@ def notify_overdue_issues():
         duedate_obj = datetime.strptime(duedate, "%Y-%m-%d").date()
 
         # Get the status value
+        if not projectItem['statusField']:
+            continue
         status = projectItem["statusField"]["name"]
 
         # Check if the project item is overdue or not
