@@ -59,8 +59,8 @@ def notify_expiring_issues():
         #     projectItem = next((entry for entry in projectNodes if entry['project']['number'] == config.project_number),
         #                        None)
 
-        # The fieldValueByName contains the date for the DueDate Field
-        if not projectItem['fieldValueByName']:
+        # The fieldValueByName contains the date and status for the DueDate Field
+        if not projectItem['fieldValueByName'] or not projectItem['statusField']:
             continue
 
         # Get the duedate value and convert it to date object
